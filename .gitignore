@@ -1,0 +1,3 @@
+/.lake
+/test/downstream/.lake
+/test/downstream/lake-manifest.json
