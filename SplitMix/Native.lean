@@ -121,4 +121,55 @@ be given in either order. -/
 def randNat (g : SplitMix) (lo hi : Nat) : Nat × SplitMix :=
   randNatRef g lo hi
 
+
+/-! ## Mutable generators
+
+`SplitMix.Gen` is a generator that is updated in place: a C object holding a `seed` and a `gamma`.
+It draws exactly what the pure functions above draw, but a draw allocates nothing and touches no
+reference counts, so it is the fast path for code that keeps one generator and draws from it
+repeatedly (a random-testing loop, for instance).
+
+The operations are `opaque`: Lean knows only their types. Their meaning is the pure `SplitMix`
+functions, and the tests check that they agree with them: `g.randNat lo hi` is `randNatRef` on the
+generator `g.get` returns, leaving `g` holding the generator `randNatRef` returns, and likewise for
+`nextUInt64` and `split`.
+
+A `Gen` is not thread-safe: two tasks must not use the same one at the same time.
+-/
+
+private opaque GenPointed : NonemptyType
+
+/-- A mutable SplitMix64 generator. Make one with `Gen.new`. -/
+def Gen : Type := GenPointed.type
+
+instance : Nonempty Gen := GenPointed.property
+
+/-- A mutable generator starting from `g`. -/
+@[extern "lean_splitmix_gen_new"]
+opaque Gen.new (g : @& SplitMix) : BaseIO Gen
+
+/-- The generator's current state, as a pure value. -/
+@[extern "lean_splitmix_gen_get"]
+opaque Gen.get (g : @& Gen) : BaseIO SplitMix
+
+/-- Replace the generator's state (to reseed it, for instance). -/
+@[extern "lean_splitmix_gen_set"]
+opaque Gen.set (g : @& Gen) (s : @& SplitMix) : BaseIO Unit
+
+/-- Draw 64 uniformly random bits (Haskell `nextWord64`). Spec: `nextUInt64`. -/
+@[extern "lean_splitmix_gen_next_uint64"]
+opaque Gen.nextUInt64 (g : @& Gen) : BaseIO UInt64
+
+/-- A uniformly random `Nat` between `lo` and `hi`, inclusive; the bounds may be given in either
+order. Spec: `randNatRef`. Bounds below 2^63 take the C fast path, which allocates nothing. -/
+@[extern "lean_splitmix_gen_rand_nat"]
+opaque Gen.randNat (g : @& Gen) (lo hi : @& Nat) :
+    BaseIO {x : Nat // min lo hi ≤ x ∧ x ≤ max lo hi} :=
+  pure ⟨min lo hi, Nat.le_refl _, by omega⟩
+
+/-- Split off an independent generator: `g` advances to the first half of `splitRef` and the
+result starts from the second. Spec: `splitRef`. -/
+@[extern "lean_splitmix_gen_split"]
+opaque Gen.split (g : @& Gen) : BaseIO Gen
+
 end SplitMix

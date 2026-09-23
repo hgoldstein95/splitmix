@@ -18,6 +18,11 @@ def splitLoop {γ} (split : γ → γ × γ) : Nat → γ → γ
 more compile to `lean_cstr_to_nat("…")` and get re-parsed on every call. -/
 @[noinline] def pow2 (k : Nat) : Nat := 2 ^ k
 
+/-- `n` draws from one mutable generator. -/
+def genLoop (gen : SplitMix.Gen) (lo hi : Nat) : Nat → Nat → BaseIO Nat
+  | 0, acc => pure acc
+  | k + 1, acc => do genLoop gen lo hi k (acc ^^^ (← gen.randNat lo hi).1)
+
 def time (label : String) (n : Nat) (act : Unit → IO String) : IO Unit := do
   let start ← IO.monoNanosNow
   let result ← act ()
@@ -32,6 +37,8 @@ def main : IO Unit := do
   IO.println s!"{n} operations each\n"
   time "randNat 0..999      SplitMix (C)" n fun _ =>
     return toString (drawLoop (SplitMix.randNat · 0 999) n sm 0)
+  time "randNat 0..999      Gen (C)" n fun _ => do
+    return toString (← genLoop (← SplitMix.Gen.new sm) 0 999 n 0)
   time "randNat 0..999      Lean spec" n fun _ =>
     return toString (drawLoop (SplitMix.randNatRef · 0 999) n sm 0)
   time "randNat 0..999      StdGen" n fun _ =>

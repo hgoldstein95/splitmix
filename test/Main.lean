@@ -24,6 +24,37 @@ def agreement (check : String → Bool → IO Unit) : IO Unit := do
     let x := (randNat h lo hi).1
     check s!"randNat {lo} {hi} in range" (min lo hi ≤ x && x ≤ max lo hi)
 
+/-- Every `Gen` operation against its pure spec, reading the state before and after with `get`.
+Bounds of every magnitude from 0 to 2^80 cover both the C fast path and the Lean fallback, and both
+orders of the bounds. -/
+def genAgreement (check : String → Bool → IO Unit) : IO Unit := do
+  let gen ← Gen.new (ofSeed 4242)
+  let mut g := ofSeed 12345
+  for i in [0:20000] do
+    let bits := i % 81
+    let (lo, g') := randNatRef g 0 (2 ^ bits); g := g'
+    let (hi, g') := randNatRef g 0 (2 ^ bits); g := g'
+    let s ← gen.get
+    let x ← gen.randNat lo hi
+    check s!"Gen.randNat agrees on {lo} {hi}" ((x.1, ← gen.get) == randNatRef s lo hi)
+    let s ← gen.get
+    let w ← gen.nextUInt64
+    check s!"Gen.nextUInt64 agrees at step {i}" ((w, ← gen.get) == s.nextUInt64)
+    if i % 100 == 0 then
+      let s ← gen.get
+      let other ← gen.split
+      check s!"Gen.split agrees at step {i}" ((← gen.get, ← other.get) == splitRef s)
+      -- The two halves are independent objects: drawing from one leaves the other alone.
+      let before ← gen.get
+      let _ ← other.nextUInt64
+      check s!"split halves are independent at step {i}" ((← gen.get) == before)
+  -- `set` replaces the state.
+  gen.set (ofSeed 7)
+  check "Gen.set replaces the state" ((← gen.get) == ofSeed 7)
+  check "Gen.new starts from its argument" ((← (← Gen.new (ofSeed 9)).get) == ofSeed 9)
+  let x ← gen.randNat 5 5
+  check "Gen.randNat on an empty range consumes nothing" (x.1 == 5 && (← gen.get) == ofSeed 7)
+
 def edgeCases (check : String → Bool → IO Unit) : IO Unit := do
   -- Seed from IO so the generator isn't a compile-time constant.
   let g ← newIO
@@ -50,6 +81,15 @@ def chiSquared (k n : Nat) (draw : SplitMix → Nat × SplitMix) (g : SplitMix) 
   let expected := n.toFloat / k.toFloat
   return counts.foldl (fun acc c => acc + (c.toFloat - expected) ^ 2 / expected) 0
 
+/-- `chiSquared` for draws from a `Gen`. -/
+def chiSquaredGen (k n : Nat) (gen : Gen) : IO Float := do
+  let mut counts := Array.replicate k 0
+  for _ in [0:n] do
+    let x ← gen.randNat 0 (k - 1)
+    counts := counts.modify x.1 (· + 1)
+  let expected := n.toFloat / k.toFloat
+  return counts.foldl (fun acc c => acc + (c.toFloat - expected) ^ 2 / expected) 0
+
 def uniformity (check : String → Bool → IO Unit) : IO Unit := do
   -- 99.9% critical values of the chi-squared distribution; seeds are fixed,
   -- so these can't flake.
@@ -59,11 +99,13 @@ def uniformity (check : String → Bool → IO Unit) : IO Unit := do
   -- Bignum range: which of three 2^64-wide bands a draw lands in.
   let bands := fun g => let (x, g) := randNat g 0 (3 * 2 ^ 64 - 1); (x / 2 ^ 64, g)
   check "uniform bignum bands" (chiSquared 3 30000 bands g < 13.82)
+  check "uniform Gen 0..9" ((← chiSquaredGen 10 100000 (← Gen.new g)) < 27.88)
 
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   let check := check failures
   agreement check
+  genAgreement check
   edgeCases check
   uniformity check
   let n ← failures.get
