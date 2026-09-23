@@ -1,13 +1,13 @@
 /-!
 # SplitMix64: specification and native bindings
 
-A port of Haskell's `splitmix` package (`System.Random.SplitMix`), bit-for-bit.
-Each operation has a pure Lean definition, which is what proofs see. Compiled
-code calls the C implementation in `c/splitmix.c` instead.
+A port of Haskell's `splitmix` package (`System.Random.SplitMix`).  Each operation has a pure Lean
+definition that proofs can consume. Compiled code calls the C implementation in `c/splitmix.c`
+instead.
 
-This is the only module with `@[extern]`/`@[export]` declarations. It lives in
-the precompiled `SplitMixFFI` library so the interpreter (`#eval`, elaboration
-time code) can find the native symbols.
+This is the only module with `@[extern]`/`@[export]` declarations. It lives in the precompiled
+`SplitMixFFI` library so the interpreter (`#eval`, elaboration time code) can find the native
+symbols.
 -/
 
 /-- A SplitMix64 generator: a 64-bit state `seed` that advances by the odd
