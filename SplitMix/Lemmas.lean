@@ -4,18 +4,8 @@ import SplitMix.Native
 
 namespace SplitMix
 
-theorem boundedLoop_le (range : Nat) (mask : UInt64) (rest fuel : Nat) (g : SplitMix) :
-    (boundedLoop range mask rest fuel g).1 ≤ range := by
-  induction fuel generalizing g with
-  | zero => simp [boundedLoop]
-  | succ fuel ih =>
-    simp only [boundedLoop]
-    split
-    · assumption
-    · exact ih _
-
 theorem boundedRef_le (range : Nat) (g : SplitMix) : (boundedRef range g).1 ≤ range :=
-  boundedLoop_le ..
+  (boundedLoop ..).1.property
 
 theorem randNat_ge_min (g : SplitMix) (lo hi : Nat) : min lo hi ≤ (randNat g lo hi).1 := by
   simp only [randNat, randNatRef]

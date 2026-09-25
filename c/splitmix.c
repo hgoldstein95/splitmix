@@ -77,8 +77,10 @@ LEAN_EXPORT lean_obj_res lean_splitmix_rand_nat_slow(lean_obj_arg g, lean_obj_ar
 
 /* A uniform draw from [0, range], for 0 < range < 2^63, by bitmask with
  * rejection: draw, mask to the bit width of `range`, retry if too large.
- * Terminates: the seed visits every 64-bit value and `mix64` is a bijection,
- * so a zero draw always comes. Advances `*seed`. */
+ * Terminates when `gamma` is odd, as `ofSeed` and `split` always make it: the
+ * seed then visits every 64-bit value and `mix64` is a bijection, so a zero
+ * draw always comes. With an even `gamma` it may loop forever, as the Lean
+ * spec then does. Advances `*seed`. */
 static inline uint64_t sm_bounded(uint64_t *seed, uint64_t gamma, uint64_t range) {
   uint64_t mask = UINT64_MAX >> __builtin_clzll(range);
   uint64_t s = *seed, x;

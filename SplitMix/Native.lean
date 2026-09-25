@@ -80,19 +80,21 @@ where
       let (x, g) := g.nextUInt64
       go ((acc <<< 64) ||| x.toNat) n g
 
-/-- Rejection loop. `fuel` exists only to make this a total function: with
-the `2^64` that `boundedRef` passes, it cannot run out for `range < 2^64`
-and practically never runs out otherwise. -/
-def boundedLoop (range : Nat) (mask : UInt64) (rest : Nat) : Nat → SplitMix → Nat × SplitMix
-  | 0, g => (0, g)
-  | fuel + 1, g =>
-    let (x, g) := drawDigits mask rest g
-    if x ≤ range then (x, g) else boundedLoop range mask rest fuel g
+local instance (range : Nat) : Nonempty {x : Nat // x ≤ range} := ⟨⟨0, Nat.zero_le _⟩⟩
+
+/-- Rejection loop: draw candidates until one is at most `range`. Where none
+ever is, the C loops forever and this is an unspecified value. -/
+def boundedLoop (range : Nat) (mask : UInt64) (rest : Nat) (g : SplitMix) :
+    {x : Nat // x ≤ range} × SplitMix :=
+  let (x, g) := drawDigits mask rest g
+  if h : x ≤ range then (⟨x, h⟩, g) else boundedLoop range mask rest g
+partial_fixpoint
 
 /-- A uniform `Nat` in `[0, range]`, for `range > 0` (Haskell `nextInteger'`). -/
 def boundedRef (range : Nat) (g : SplitMix) : Nat × SplitMix :=
   let (mask, rest) := rangeShape range
-  boundedLoop range mask rest (2 ^ 64) g
+  let (x, g) := boundedLoop range mask rest g
+  (x.val, g)
 
 /-- Specification of `randNat` (Haskell `nextInteger`). -/
 def randNatRef (g : SplitMix) (lo hi : Nat) : Nat × SplitMix :=
