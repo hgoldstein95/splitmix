@@ -71,6 +71,21 @@ def edgeCases (check : String → Bool → IO Unit) : IO Unit := do
     check s!"edge {lo} {hi}" (randNat g lo hi == randNatRef g lo hi)
   check "empty range consumes nothing" (randNat g 5 5 == (5, g))
 
+/-- `ofSeed` and `split` only make odd gammas, but `SplitMix.mk` and `Gen.set` accept any, and with
+an even one the rejection loop visits fewer seeds. These inputs are ones where it still accepts, after
+rejecting some candidates. -/
+def degenerateGamma (check : String → Bool → IO Unit) : IO Unit := do
+  let gen ← Gen.new (ofSeed 0)
+  for gamma in ([0, 2, 6, 2 ^ 62, 2 ^ 63] : List UInt64) do
+    for seed in ([1, 123, 135, 139] : List UInt64) do
+      for (lo, hi) in [(0, 999), (999, 0), (0, 2 ^ 64), (3, 2 ^ 100)] do
+        let g : SplitMix := ⟨seed, gamma⟩
+        check s!"randNat agrees at gamma {gamma} on {lo} {hi}" (randNat g lo hi == randNatRef g lo hi)
+        gen.set g
+        let x ← gen.randNat lo hi
+        check s!"Gen.randNat agrees at gamma {gamma} on {lo} {hi}"
+          ((x.1, ← gen.get) == randNatRef g lo hi)
+
 /-- Pearson's chi-squared statistic for `n` draws into `k` buckets. -/
 def chiSquared (k n : Nat) (draw : SplitMix → Nat × SplitMix) (g : SplitMix) : Float := Id.run do
   let mut counts := Array.replicate k 0
@@ -107,6 +122,7 @@ def main : IO UInt32 := do
   agreement check
   genAgreement check
   edgeCases check
+  degenerateGamma check
   uniformity check
   let n ← failures.get
   if n == 0 then
