@@ -1,4 +1,7 @@
+module
+
 import SplitMix
+meta import SplitMix
 
 /-! These run in the interpreter while this file is elaborated, so a build
 failure here means `#eval` can't find the native code, or the C disagrees

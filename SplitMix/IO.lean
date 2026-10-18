@@ -1,4 +1,8 @@
-import SplitMix.Native
+module
+
+public import SplitMix.Native
+
+public section
 
 namespace SplitMix
 
