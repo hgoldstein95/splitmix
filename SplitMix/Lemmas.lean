@@ -1,6 +1,10 @@
-import SplitMix.Native
+module
+
+public import SplitMix.Native
 
 /-! Every `randNat` result lies between its bounds. -/
+
+public section
 
 namespace SplitMix
 

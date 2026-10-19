@@ -1,3 +1,5 @@
+module
+
 /-!
 # SplitMix64: specification and native bindings
 
@@ -9,6 +11,8 @@ This is the only module with `@[extern]`/`@[export]` declarations. It lives in t
 `SplitMixFFI` library so the interpreter (`#eval`, elaboration time code) can find the native
 symbols.
 -/
+
+@[expose] public section
 
 /-- A SplitMix64 generator: a 64-bit state `seed` that advances by the odd
 constant `gamma` on each draw. Build one with `SplitMix.ofSeed` or
@@ -123,6 +127,9 @@ be given in either order. -/
 def randNat (g : SplitMix) (lo hi : Nat) : Nat × SplitMix :=
   randNatRef g lo hi
 
+end SplitMix
+
+end
 
 /-! ## Mutable generators
 
@@ -138,6 +145,10 @@ generator `g.get` returns, leaving `g` holding the generator `randNatRef` return
 
 A `Gen` is not thread-safe: two tasks must not use the same one at the same time.
 -/
+
+public section
+
+namespace SplitMix
 
 private opaque GenPointed : NonemptyType
 
@@ -175,3 +186,5 @@ result starts from the second. Spec: `splitRef`. -/
 opaque Gen.split (g : @& Gen) : BaseIO Gen
 
 end SplitMix
+
+end
